@@ -1,0 +1,4 @@
+{
+  "name": "LogFold Visualizer",
+  "description": "A tool to parse, filter, and visualize machine learning training logs, specifically focusing on Fold/Epoch metrics and removing noise."
+}
