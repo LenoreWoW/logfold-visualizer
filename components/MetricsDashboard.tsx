@@ -1,7 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { MetricData, GlobalStats } from '../types';
-import { GoogleGenAI } from "@google/genai";
-import { Sparkles, X } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -22,9 +20,6 @@ interface MetricsDashboardProps {
 }
 
 export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({ metrics, stats }) => {
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-
   const stepData = useMemo(() => metrics.filter(m => m.type === 'step'), [metrics]);
   const epochData = useMemo(() => metrics.filter(m => m.type === 'epoch_end'), [metrics]);
 
@@ -43,84 +38,32 @@ export const MetricsDashboard: React.FC<MetricsDashboardProps> = ({ metrics, sta
 
   const avgF1 = foldSummary.reduce((acc, curr) => acc + curr.maxF1, 0) / (foldSummary.length || 1);
 
-  const generateInsights = async () => {
-    setIsGenerating(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const summaryText = JSON.stringify({
-        global: stats,
-        folds: foldSummary,
-        averageF1: avgF1
-      });
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Analyze these training results for a RoBERTa Disaster Tweet classifier. 
-        Data: ${summaryText}. 
-        Provide 3 bullet points of high-level insights for a presentation slide. 
-        Focus on stability, best fold, and overall performance. Keep it brief and professional.`
-      });
-      
-      setAiInsight(response.text);
-    } catch (e) {
-      console.error(e);
-      setAiInsight("Could not generate insights. Please check API key.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
   if (metrics.length === 0) return null;
 
   return (
     <div className="h-full overflow-y-auto p-2 space-y-6">
       
       {/* Global Stats Banner */}
-      <div className="flex gap-4 items-stretch">
-        <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
-           <div className="bg-slate-900/50 backdrop-blur border border-slate-800 p-4 rounded-xl">
-              <p className="text-slate-500 text-xs font-bold uppercase">Best OOF F1</p>
-              <p className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                 {stats.oofF1?.toFixed(4) || "N/A"}
-              </p>
-           </div>
-           <div className="bg-slate-900/50 backdrop-blur border border-slate-800 p-4 rounded-xl">
-              <p className="text-slate-500 text-xs font-bold uppercase">Average F1</p>
-              <p className="text-3xl font-bold text-cyan-400">{avgF1.toFixed(4)}</p>
-           </div>
-           <div className="bg-slate-900/50 backdrop-blur border border-slate-800 p-4 rounded-xl">
-              <p className="text-slate-500 text-xs font-bold uppercase">Total Duration</p>
-              <p className="text-3xl font-bold text-slate-200">{stats.duration ? `${(stats.duration / 60).toFixed(0)}m` : "N/A"}</p>
-           </div>
-           <div className="bg-slate-900/50 backdrop-blur border border-slate-800 p-4 rounded-xl">
-              <p className="text-slate-500 text-xs font-bold uppercase">Total Folds</p>
-              <p className="text-3xl font-bold text-slate-200">{foldSummary.length}</p>
-           </div>
-        </div>
-        
-        {/* AI Insight Button */}
-        <button 
-          onClick={generateInsights}
-          disabled={isGenerating}
-          className="bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white p-4 rounded-xl flex flex-col items-center justify-center min-w-[100px] shadow-lg shadow-purple-900/20 transition-all active:scale-95 disabled:opacity-50"
-        >
-          {isGenerating ? <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"/> : <Sparkles size={24} />}
-          <span className="text-xs font-bold mt-1 uppercase">Insights</span>
-        </button>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+         <div className="bg-slate-900/50 backdrop-blur border border-slate-800 p-4 rounded-xl">
+            <p className="text-slate-500 text-xs font-bold uppercase">Best OOF F1</p>
+            <p className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+               {stats.oofF1?.toFixed(4) || "N/A"}
+            </p>
+         </div>
+         <div className="bg-slate-900/50 backdrop-blur border border-slate-800 p-4 rounded-xl">
+            <p className="text-slate-500 text-xs font-bold uppercase">Average F1</p>
+            <p className="text-3xl font-bold text-cyan-400">{avgF1.toFixed(4)}</p>
+         </div>
+         <div className="bg-slate-900/50 backdrop-blur border border-slate-800 p-4 rounded-xl">
+            <p className="text-slate-500 text-xs font-bold uppercase">Total Duration</p>
+            <p className="text-3xl font-bold text-slate-200">{stats.duration ? `${(stats.duration / 60).toFixed(0)}m` : "N/A"}</p>
+         </div>
+         <div className="bg-slate-900/50 backdrop-blur border border-slate-800 p-4 rounded-xl">
+            <p className="text-slate-500 text-xs font-bold uppercase">Total Folds</p>
+            <p className="text-3xl font-bold text-slate-200">{foldSummary.length}</p>
+         </div>
       </div>
-
-      {/* AI Insight Overlay Card */}
-      {aiInsight && (
-        <div className="bg-indigo-950/30 border border-indigo-500/30 p-6 rounded-xl relative animate-fade-in-up">
-           <button onClick={() => setAiInsight(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X size={16}/></button>
-           <h4 className="flex items-center gap-2 text-indigo-300 font-bold mb-3 uppercase text-sm tracking-wider">
-             <Sparkles size={14} /> AI Analysis
-           </h4>
-           <div className="prose prose-invert prose-sm max-w-none">
-              <pre className="whitespace-pre-wrap font-sans text-slate-300 bg-transparent border-0 p-0 m-0">{aiInsight}</pre>
-           </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Chart */}

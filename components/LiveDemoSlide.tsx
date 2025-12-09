@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Send, AlertTriangle, CheckCircle, Activity, Zap } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 
 const SAMPLE_TWEETS = [
   "Just happened a terrible car crash",
@@ -9,6 +8,45 @@ const SAMPLE_TWEETS = [
   "I love this movie! It was a total blast.",
   "The sky is ablaze with the sunset tonight."
 ];
+
+// Simple keyword-based classifier for demo purposes
+const classifyTweet = (text: string): { isDisaster: boolean; confidence: number; reason: string } => {
+  const lowerText = text.toLowerCase();
+
+  // Disaster keywords
+  const disasterKeywords = [
+    'earthquake', 'fire', 'crash', 'accident', 'disaster', 'emergency',
+    'flood', 'hurricane', 'tornado', 'explosion', 'bombing', 'attack',
+    'evacuation', 'injured', 'casualties', 'destroyed', 'damage', 'storm',
+    'tsunami', 'avalanche', 'collapsed', 'burning', 'rescue', 'victim'
+  ];
+
+  // Non-disaster keywords that might be confused
+  const safeKeywords = ['movie', 'game', 'love', 'beautiful', 'sunset', 'sunrise', 'metaphor'];
+
+  const hasDisasterKeyword = disasterKeywords.some(kw => lowerText.includes(kw));
+  const hasSafeKeyword = safeKeywords.some(kw => lowerText.includes(kw));
+
+  if (hasDisasterKeyword && !hasSafeKeyword) {
+    return {
+      isDisaster: true,
+      confidence: 0.75 + Math.random() * 0.2,
+      reason: "Contains disaster-related keywords"
+    };
+  } else if (hasSafeKeyword) {
+    return {
+      isDisaster: false,
+      confidence: 0.80 + Math.random() * 0.15,
+      reason: "Context suggests non-literal usage"
+    };
+  } else {
+    return {
+      isDisaster: Math.random() > 0.5,
+      confidence: 0.55 + Math.random() * 0.15,
+      reason: "Ambiguous content classification"
+    };
+  }
+};
 
 export const LiveDemoSlide: React.FC = () => {
   const [input, setInput] = useState('');
@@ -20,43 +58,12 @@ export const LiveDemoSlide: React.FC = () => {
     setIsLoading(true);
     setResult(null);
 
-    try {
-      // We use Gemini to simulate the RoBERTa model's behavior for the demo
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `You are acting as a RoBERTa-based disaster tweet classifier trained on the Kaggle NLP dataset. 
-        Classify the following tweet.
-        Tweet: "${input}"
-        
-        Is this describing a real disaster? 
-        Return ONLY a JSON object with this format:
-        {
-          "isDisaster": boolean,
-          "confidence": number (between 0.5 and 0.99),
-          "reason": "short explanation of why (max 10 words)"
-        }
-        `,
-        config: {
-          responseMimeType: "application/json"
-        }
-      });
-
-      const text = response.text;
-      if (text) {
-        setResult(JSON.parse(text));
-      }
-    } catch (e) {
-      console.error(e);
-      // Fallback if API fails
-      setResult({ 
-        isDisaster: Math.random() > 0.5, 
-        confidence: 0.75, 
-        reason: "Simulated fallback response" 
-      });
-    } finally {
+    // Simulate processing delay
+    setTimeout(() => {
+      const classification = classifyTweet(input);
+      setResult(classification);
       setIsLoading(false);
-    }
+    }, 800);
   };
 
   return (

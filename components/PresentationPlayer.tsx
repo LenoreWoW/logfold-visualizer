@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Play, Pause, RefreshCw, Maximize2, Minimize2, Cpu, Network, ShieldCheck, AlertOctagon, Database, ScanLine, Binary, Volume2, VolumeX } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { Play, Pause, RefreshCw, Maximize2, Minimize2, Cpu, Network, ShieldCheck, AlertOctagon, Database, ScanLine, Binary } from 'lucide-react';
 import { GlobalStats, MetricData } from '../types';
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell, Tooltip, CartesianGrid, Line, Brush, ReferenceLine } from 'recharts';
 
@@ -10,37 +9,6 @@ interface PresentationPlayerProps {
 }
 
 const SCENE_DURATION = 12000; // 12 seconds per slide
-
-// --- Audio Utilities ---
-
-function decodeBase64(base64: string) {
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
-
-async function decodeAudioData(
-  data: Uint8Array,
-  ctx: AudioContext,
-  sampleRate: number,
-  numChannels: number,
-): Promise<AudioBuffer> {
-  const dataInt16 = new Int16Array(data.buffer);
-  const frameCount = dataInt16.length / numChannels;
-  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-
-  for (let channel = 0; channel < numChannels; channel++) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
-    }
-  }
-  return buffer;
-}
 
 // --- Utility Components ---
 
@@ -102,11 +70,6 @@ export const PresentationPlayer: React.FC<PresentationPlayerProps> = ({ stats, m
   const [progress, setProgress] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isHoveringChart, setIsHoveringChart] = useState(false);
-  
-  // Audio State
-  const [isNarrating, setIsNarrating] = useState(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const activeSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -434,79 +397,6 @@ export const PresentationPlayer: React.FC<PresentationPlayerProps> = ({ stats, m
   ], [stats, metrics, averageF1, epochData, foldPerformance]);
 
   // --- Narration Logic ---
-  
-  const playCaption = async (text: string) => {
-    if (!audioContextRef.current) return;
-
-    // Stop previous audio
-    if (activeSourceRef.current) {
-      try { activeSourceRef.current.stop(); } catch(e) {}
-      activeSourceRef.current = null;
-    }
-
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text }] }],
-        config: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
-            },
-          },
-        },
-      });
-
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) {
-        const audioBytes = decodeBase64(base64Audio);
-        const audioBuffer = await decodeAudioData(audioBytes, audioContextRef.current, 24000, 1);
-        
-        const source = audioContextRef.current.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContextRef.current.destination);
-        source.start();
-        activeSourceRef.current = source;
-      }
-    } catch (e) {
-      console.error("Narration failed", e);
-      setIsNarrating(false); // Disable if error (e.g. no API key)
-    }
-  };
-
-  const toggleNarration = () => {
-     if (!audioContextRef.current) {
-         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-     }
-     
-     // Resume context if suspended (browser policy)
-     if (audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume();
-     }
-
-     const newState = !isNarrating;
-     setIsNarrating(newState);
-     
-     if (!newState && activeSourceRef.current) {
-         activeSourceRef.current.stop();
-     } else if (newState) {
-         playCaption(scenes[currentScene].caption);
-     }
-  };
-
-  useEffect(() => {
-     if (isNarrating) {
-         playCaption(scenes[currentScene].caption);
-     }
-     // Cleanup when component unmounts or scene changes
-     return () => {
-        if (activeSourceRef.current) {
-            try { activeSourceRef.current.stop(); } catch(e) {}
-        }
-     };
-  }, [currentScene, isNarrating, scenes]);
 
 
   // --- Animation Loop ---
@@ -609,14 +499,6 @@ export const PresentationPlayer: React.FC<PresentationPlayerProps> = ({ stats, m
            
            <button onClick={reset} className="text-slate-500 hover:text-white transition-colors" title="Restart">
               <RefreshCw size={18} />
-           </button>
-           
-           <button 
-             onClick={toggleNarration} 
-             className={`transition-colors ${isNarrating ? 'text-cyan-400' : 'text-slate-500 hover:text-white'}`}
-             title={isNarrating ? "Disable Narration" : "Enable Narration"}
-           >
-              {isNarrating ? <Volume2 size={18} /> : <VolumeX size={18} />}
            </button>
 
            <div className="flex-1 flex gap-1 h-1.5 bg-slate-900 rounded-full overflow-hidden">
